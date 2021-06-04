@@ -31,9 +31,12 @@ import {
   DebugInstructions,
   ReloadInstructions,
 } from 'react-native/Libraries/NewAppScreen';
+import {create} from 'apisauce';
+import {serverKey} from './config-server';
 
 const App = () => {
   // var admin = require('firebase-admin');
+  const client = create({baseURL: 'https://fcm.googleapis.com/fcm/'});
   const [token, setToken] = useState('');
   const [message, setMessage] = useState('');
   const [notifications, setNotifcations] = useState([]);
@@ -53,53 +56,55 @@ const App = () => {
       .getToken()
       .then((token) => {
         return setToken(token);
-        // return saveTokenToDatabase(token);
       });
 
     // Listen to whether the token changes
     return messaging().onTokenRefresh((token) => {
       setToken(token);
-      // saveTokenToDatabase(token);
     });
   }, []);
 
-  // async function saveTokenToDatabase(token) {
-  //   // Assume user is already signed in
-  //   const userId = 'user-101-test-1';
-
-  //   // Add the token to the users datastore
-  //   await firestore()
-  //     .collection('users')
-  //     .doc(userId)
-  //     .update({
-  //       tokens: firestore.FieldValue.arrayUnion(token),
-  //     });
-  // }
-
-  const SendNotification = async () => {
-    // Get the owners details
-    // const owner = firestore().collection('users').doc(ownerId).get();
-
-    // Get the users details
-    // const user = firestore().collection('users').doc(userId).get();
-
-    await messaging().sendToDevice(
-      token, // ['token_1', 'token_2', ...]
+  const sendMessage = (recievers, notification, data) =>
+    client.post(
+      'send',
       {
+        registration_ids: recievers,
+        collapse_key: 'type_a',
+        notification: {
+          body: notification?.body,
+          title: notification?.title,
+          image: notification?.image,
+        },
         data: {
-          message: 'This is a notification',
-          // owner: JSON.stringify(owner),
-          // user: JSON.stringify(user),
-          // picture: JSON.stringify(picture),
+          body: data.body,
+          title: data.title,
         },
       },
-      {
-        // Required for background/quit data-only messages on iOS
-        contentAvailable: true,
-        // Required for background/quit data-only messages on Android
-        priority: 'high',
-      },
+      {headers: {Authorization: `key=${serverKey}`}},
     );
+
+  const onSendNotification = async () => {
+    let recievers = [
+      'c2CGPpOWTUqmeQEfmWQh_e:APA91bFThpw3p9OGu3snzEp0Tp3W_VFfFtV8dXoSH_-b-_9vL3ZoV4yp_7kceAgVv53SegJoHeup03yXjyXfYDNIAX7v5DxidRyQD8g8A9sblUqkeIkLz-DcrG-VCoHS0-E0YpWdZ1Pj',
+      'cp4JfHbQQtWG5F1kynh38X:APA91bFvDXMvPNS5IkRLtNonnijQ6JbnZe0NQjSr84oEpaaKaq6oUCYVGCb3hd_7kM-htq9sVgwHCF3FAzliTG9KYFPwTNcfnw6S68kpqxw3uAJeOnr0MdjXyiex-s1mJD6f26Ru2V3s',
+    ];
+    //  "collapse_key" = "type_a",
+    let notification = {
+      body: message,
+      title: 'FCM API Test',
+      image:
+        'https://images.unsplash.com/photo-1612151855475-877969f4a6cc?ixid=MnwxMjA3fDB8MHxzZWFyY2h8MXx8aGQlMjBpbWFnZXxlbnwwfHwwfHw%3D&ixlib=rb-1.2.1&w=1000&q=80',
+    };
+    let data = {
+      body: 'Testing the fcm api using a test notification and understanding how it works',
+      title: 'Test For FCM API',
+    };
+    const send = await sendMessage(recievers, notification, data);
+    if (!send.ok) {
+      Alert.alert('This is not working');
+      console.log('Error Message :', send);
+    }
+    console.log('Result from fcm API:', send.results);
     setMessage('');
   };
 
@@ -109,41 +114,51 @@ const App = () => {
   return (
     <>
       <StatusBar barStyle="dark-content" />
-      <SafeAreaView>
-        <ScrollView
+      <SafeAreaView style={styles.scrollView}>
+        <FlatList
+          style={styles.body}
           contentInsetAdjustmentBehavior="automatic"
-          style={styles.scrollView}>
-          <View style={styles.body}>
+          ListHeaderComponentStyle={styles.body}
+          ListEmptyComponent={
             <View style={styles.sectionContainer}>
-              <Text style={styles.sectionTitle}>Push Notifications</Text>
-              <Text style={styles.sectionDescription}>
-                Let's' <Text style={styles.highlight}>do this</Text>
-              </Text>
+              <Text>No Notifications</Text>
             </View>
+          }
+          ListHeaderComponent={
+            <>
+              <View style={styles.sectionContainer}>
+                <Text style={styles.sectionTitle}>Push Notifications</Text>
+                <Text style={styles.sectionDescription}>
+                  Let's' <Text style={styles.highlight}>do this</Text>
+                </Text>
+              </View>
+              <View style={styles.sectionContainer}>
+                {/* <Text style={styles.sectionTitle}>Push Notifications</Text> */}
+                <Text style={styles.sectionDescription}>
+                  Setting up the notifications
+                </Text>
+                <Button title="View Token" onPress={viewToken} />
+                <Text>{token}</Text>
+                <TextInput
+                  placeholder="Enter Notification Message"
+                  onChangeText={(value) => setMessage(value)}
+                />
+                <Button
+                  title="Notify"
+                  onPress={onSendNotification}
+                  disabled={!message}
+                />
+                <Text>{message}</Text>
+              </View>
+            </>
+          }
+          data={notifications}
+          renderItem={({item}) => (
             <View style={styles.sectionContainer}>
-              {/* <Text style={styles.sectionTitle}>Push Notifications</Text> */}
-              <Text style={styles.sectionDescription}>
-                Setting up the notifications
-              </Text>
-              <Button title="View Token" onPress={viewToken} />
-              <Text>{token}</Text>
-              <TextInput
-                placeholder="Enter Notification Message"
-                onChangeText={(value) => setMessage(value)}
-              />
-              <Button title="Notify" onPress={SendNotification} />
-              <Text>{message}</Text>
+              <Text style={styles.sectionTitle}>{item.title}</Text>
             </View>
-            <FlatList
-              data={notifications}
-              renderItem={({item}) => (
-                <View>
-                  <Text>{item.title}</Text>
-                </View>
-              )}
-            />
-          </View>
-        </ScrollView>
+          )}
+        />
       </SafeAreaView>
     </>
   );

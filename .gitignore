@@ -61,3 +61,4 @@ buck-out/
 
 # Google Services Json
 google-services.json
+config-server.js
