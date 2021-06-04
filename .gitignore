@@ -60,4 +60,4 @@ buck-out/
 
 
 # Google Services Json
-android/app/google-services
+google-services.json
